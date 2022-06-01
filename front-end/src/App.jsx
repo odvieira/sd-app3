@@ -1,35 +1,20 @@
 import './App.scss'
-import { BrowserRouter, Routes, Route } from "react-router-dom"
-import Layout from "./pages/Layout.jsx"
-import Home from "./pages/Home.jsx"
-import NoPage from "./pages/NoPage.jsx"
-import Service from './pages/Service.jsx'
-import create from 'zustand'
-
-const useStore = create((set) => ({
-  username: '',
-  isUsernameSet: false,
-  setUsername: () => set((newValue) => ({
-    username: newValue,
-    isUsernameSet: true
-  })),
-  disconnect: () => set(() => ({
-    username: '',
-    isUsernameSet: false
-  }))
-}))
-
+import Home from "./page/Home"
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom"
+import NoPage from "./page/NoPage"
+import Service from './page/Service'
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
+    <div className='App'>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Home />} />
           <Route path='/home' element={<Home />} />
           <Route path='/service' element={<Service />} />
           <Route path="*" element={<NoPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </Router>
+    </div>
   )
 }
