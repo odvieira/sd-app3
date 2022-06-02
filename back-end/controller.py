@@ -1,11 +1,39 @@
+from flask import Flask, jsonify
+from flask_sse import sse
+import logging
+from apscheduler.schedulers.background import BackgroundScheduler
+from flask_cors import CORS
 from threading import Thread
 from threading import Lock
 from time import time_ns
 from RepeatTimer import RepeatTimer
 from redis import Redis
-from pottery import RedisDict
 
 redis = Redis.from_url('redis://localhost:6379')
+redis.flushall(asynchronous=False)
+
+user = {}
+
+app = Flask(__name__)
+CORS(app)
+app.config["REDIS_URL"] = 'redis://127.0.0.1:6379'
+app.register_blueprint(sse, url_prefix='/stream')
+log = logging.getLogger('apscheduler.executors.default')
+log.setLevel(logging.INFO)
+fmt = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
+h = logging.StreamHandler()
+h.setFormatter(fmt)
+log.addHandler(h)
+
+def print_status():
+    print('Queue1: {0}   Queue2: {1}                              '
+          .format(subscribers, subscribers2), end='\r')
+
+
+def updateStatus(usr: str, msg: str):
+    with app.app_context():
+        sse.publish(msg, type='message', channel=usr)
+
 
 DEFALUT_LEASING_TIME = 15000000000
 
@@ -33,12 +61,9 @@ class GenericResource(object):
                 subscribers.append(id)
 
                 if len(subscribers) == 1:
-                    res = "HELD {0}".format(subscribers)
                     try:
-                        # Notify the client that he is helding the resource
-                        remote_ref_callback = Proxy(
-                            "PYRONAME:client{0}.callback"
-                            .format(subscribers[0]))
+                        # Notify the client that he is holding the resource
+                        updateStatus(id, 'HELD')
                     except:
                         print('Acquire Lock error.')
                     else:
@@ -46,12 +71,7 @@ class GenericResource(object):
                         with lock_leasing_time:
                             leasing_time = time_ns() + DEFALUT_LEASING_TIME
 
-                        message = '{0} {1}'.format(
-                            str(type(self))[17:-2], res).encode()
-
-                        remote_ref_callback.notify(
-                            message.decode()
-                        )
+                        
 
     def release_lock(self, id) -> None:
         global subscribers
@@ -65,25 +85,18 @@ class GenericResource(object):
                 subscribers.pop(0)
 
                 if len(subscribers) > 0:
-                    res = "HELD {0}".format(subscribers)
                     try:
-                        # Notify the client that he is helding the resource
-                        remote_ref_callback = Proxy(
-                            "PYRONAME:client{0}.callback"
-                            .format(subscribers[0]))
+                        # Notify the client that he is holding the resource
+                        updateStatus(subscribers[0], 'HELD')
                     except:
                         print('Acquire Lock error.')
                     else:
                         # It sets a timeout for resource usage
                         with lock_leasing_time:
                             leasing_time = time_ns() + DEFALUT_LEASING_TIME
-
-                        message = '{0} {1}'.format(
-                            str(type(self))[17:-2], res).encode()
-
-                        remote_ref_callback.notify(
-                            message.decode()
-                        )
+                else:
+                    with lock_leasing_time:
+                        leasing_time = None
 
             elif id in subscribers:
                 subscribers.remove(id)
@@ -100,25 +113,15 @@ class GenericResource2(object):
                 subscribers2.append(id)
 
                 if len(subscribers2) == 1:
-                    res = "HELD {0}".format(subscribers2)
                     try:
-                        # Notify the client that he is helding the resource
-                        remote_ref_callback = Proxy(
-                            "PYRONAME:client{0}.callback"
-                            .format(subscribers2[0]))
+                        # Notify the client that he is holding the resource
+                        updateStatus(id, 'HELD')
                     except:
                         print('Acquire Lock error.')
                     else:
                         # It sets a timeout for resource usage
                         with lock_leasing_time2:
                             leasing_time2 = time_ns() + DEFALUT_LEASING_TIME
-
-                        message = '{0} {1}'.format(
-                            str(type(self))[17:-2], res).encode()
-
-                        remote_ref_callback.notify(
-                            message.decode()
-                        )
 
     def release_lock(self, id) -> None:
         global subscribers2
@@ -132,24 +135,18 @@ class GenericResource2(object):
                 subscribers2.pop(0)
 
                 if len(subscribers2) > 0:
-                    res = "HELD {0}".format(subscribers2)
                     try:
-                        # Notify the client that he is helding the resource
-                        remote_ref_callback = Proxy(
-                            "PYRONAME:client{0}.callback"
-                            .format(subscribers2[0]))
+                        # Notify the client that he is holding the resource
+                        updateStatus(subscribers2[0], 'HELD')
                     except:
                         print('Acquire Lock error.')
                     else:
                         # It sets a timeout for resource usage
                         with lock_leasing_time2:
                             leasing_time2 = time_ns() + DEFALUT_LEASING_TIME
-                        message = '{0} {1}'.format(
-                            str(type(self))[17:-2], res).encode()
-
-                        remote_ref_callback.notify(
-                            message.decode()
-                        )
+                else:
+                    with lock_leasing_time2:
+                        leasing_time2 = None
 
             elif id in subscribers2:
                 subscribers2.remove(id)
@@ -182,46 +179,22 @@ class PyScheduler(Thread):
                         if len(subscribers) > 0:
                             released_id = subscribers.pop(0)
 
-                            res = "RELEASED {0}".format(subscribers)
-
                             try:
                                 # Notify the client that he released the resource
-                                remote_ref_callback = Proxy(
-                                    "PYRONAME:client{0}.callback"
-                                    .format(released_id))
+                                updateStatus(released_id, 'RELEASED')
                             except:
                                 print('Release Lock error.')
-                            else:
-                                message = '{0} {1}'.format(
-                                    str(type(self))[17:-2], res).encode()
-
-                                remote_ref_callback.notify(
-                                    message.decode()
-                                )
-
-                            # Maybe insert a block here to wait until the client
-                            # informs that stoped the usage
 
                             if len(subscribers) > 0:
-                                res = "HELD {0}".format(subscribers)
                                 try:
-                                    # Notify the client that he is helding the resource
-                                    remote_ref_callback = Proxy(
-                                        "PYRONAME:client{0}.callback"
-                                        .format(subscribers[0]))
+                                    # Notify the client that he is holding the resource
+                                    updateStatus(subscribers[0], 'HELD')
                                 except:
                                     print('Acquire Lock error.')
                                 else:
                                     # It sets a timeout for resource usage
                                     with lock_leasing_time:
                                         leasing_time = time_ns() + DEFALUT_LEASING_TIME
-
-                                    message = '{0} {1}'.format(
-                                        str(type(self))[17:-2], res).encode()
-
-                                    remote_ref_callback.notify(
-                                        message.decode()
-                                    )
 
             if leasing_time2 is not None:
                 flag2 = False
@@ -236,33 +209,16 @@ class PyScheduler(Thread):
                         if len(subscribers2) > 0:
                             released_id = subscribers2.pop(0)
 
-                            res = "RELEASED {0}".format(subscribers2)
-
                             try:
                                 # Notify the client that he released the resource
-                                remote_ref_callback = Proxy(
-                                    "PYRONAME:client{0}.callback"
-                                    .format(released_id))
+                                updateStatus(released_id, 'RELEASED')
                             except:
                                 print('Release Lock error.')
-                            else:
-                                message = '{0} {1}'.format(
-                                    str(type(self))[17:-2], res).encode()
-
-                                remote_ref_callback.notify(
-                                    message.decode()
-                                )
-
-                            # Maybe insert a block here to wait until the client
-                            # informs that stoped the usage
 
                             if len(subscribers2) > 0:
-                                res = "HELD {0}".format(subscribers2)
                                 try:
-                                    # Notify the client that he is helding the resource
-                                    remote_ref_callback = Proxy(
-                                        "PYRONAME:client{0}.callback"
-                                        .format(subscribers2[0]))
+                                    # Notify the client that he is holding the resource
+                                    updateStatus(subscribers2[0], 'HELD')
                                 except:
                                     print('Acquire Lock error.')
                                 else:
@@ -270,20 +226,44 @@ class PyScheduler(Thread):
                                     with lock_leasing_time2:
                                         leasing_time2 = time_ns() + DEFALUT_LEASING_TIME
 
-                                    message = '{0} {1}'.format(
-                                        str(type(self))[17:-2], res).encode()
 
-                                    remote_ref_callback.notify(
-                                        message.decode()
-                                    )
+@app.route('/')
+def index():
+    return jsonify('OK')
 
 
-def print_status():
-    print('Queue1: {0}   Queue2: {1}                              '
-          .format(subscribers, subscribers2), end='\r')
+@app.route('/acquire/<username>/<resource>')
+def acquire(username, resource):
+    if resource == '1':
+        pass
+    else:
+        pass
+
+
+@app.route('/release/<username>/<resource>')
+def release(username, resource):
+    if resource == '1':
+        pass
+    else:
+        pass
+
+
+@app.route('/connect/<username>')
+def connect(username):
+    user[username] = {}
+
+    user[username]['status'] = 'RELEASED'
+
+    sched.add_job(updateStatus, args=[username, 'RELEASED'])
+
 
 if __name__ == '__main__':
+    sched = BackgroundScheduler(daemon=True)
+    sched.start()
+
     task_scheduler = PyScheduler()
     task_scheduler.start()
 
-    RepeatTimer(1, print_status).start()
+    RepeatTimer(2, print_status).start()
+
+    app.run(debug=True, host='0.0.0.0', port=5000)
