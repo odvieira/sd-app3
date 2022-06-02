@@ -3,7 +3,7 @@ from flask_sse import sse
 from flask_cors import CORS
 from flask_apscheduler import APScheduler
 import os
-from controller import Controller
+from services import Controller
 
 # Flask
 app = Flask(__name__)
