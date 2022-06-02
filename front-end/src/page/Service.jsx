@@ -9,22 +9,29 @@ import axios from 'axios'
 
 export default function Service() {
     const uname = useStore(state => state.username)
-    const [selfStatus, setSelfStatus] = useState('DISCONNECTED')
+    const [resource1, setResource1] = useState('DISCONNECTED')
+    const [resource2, setResource2] = useState('DISCONNECTED')
     const [user, setUser] = useState(uname)
     const [resource, setResource] = useState('1')
     const navigate = useNavigate()
-    var source = new EventSource("http://localhost:5000/stream?channel=" + user);
     const hostAddress = "http://localhost:5000"
 
-    source.addEventListener('message', function (event) {
-        console.log([user, event.data])
-    }, false);
+    var statusListener1 = new EventSource("http://localhost:5000/stream?channel=" + user + '1');
+    var statusListener2 = new EventSource("http://localhost:5000/stream?channel=" + user + '2');
 
-    source.addEventListener('error', function (event) {
-        console.log(event.data);
-    }, false);
+    statusListener1.addEventListener(
+        'message',
+        e => { setResource1(e.data) },
+        false
+    );
 
-    handleAcquire = () => {
+    statusListener2.addEventListener(
+        'message',
+        e => { setResource2(e.data) },
+        false
+    );
+    
+    const handleAcquire = () => {
         axios({
             method: 'get',
             url: hostAddress + "/acquire/" + user + "/" + resource,
@@ -36,8 +43,15 @@ export default function Service() {
 
     }
 
-    handleRelease = () => {
-
+    const handleRelease = () => {
+        axios({
+            method: 'get',
+            url: hostAddress + "/release/" + user + "/" + resource,
+            responseType: 'text'
+        })
+            .then(function (response) {
+                console.log(response.data)
+            });
     }
 
     const Bar = () => {
@@ -52,22 +66,6 @@ export default function Service() {
                         </Button>
                     </Container>
                 </Navbar>
-                <div className="ServiceBody" style={{ padding: 30 }}>
-                    <h1>Hello, {user}!</h1>
-                    <Stack gap={2} className="col-md-5 mx-auto">
-                        <Button
-                            variant="primary"
-                            onClick={() => handleAcquire()}>
-                            Acquire Lock
-                        </Button>
-                        <Button
-                            variant="outline-primary"
-                            onClick={() => handleRelease()}>
-                            Release Lock
-                        </Button>
-                    </Stack>
-                    <p className="status-label">Status: {selfStatus}</p>
-                </div>
             </div>
         )
     }
@@ -75,6 +73,29 @@ export default function Service() {
     return (
         <div>
             <Bar />
+            <div className="ServiceBody" style={{ padding: 30 }}>
+                <h1>Hello, {user}!</h1>
+                <Stack gap={4} className="col-md-5 mx-auto" style={{margin: 40}}>
+                    <Button
+                        variant="success"
+                        onClick={() => handleAcquire()}>
+                        Acquire Lock
+                    </Button>
+                    <Button
+                        variant="success"
+                        onClick={() => handleRelease()}>
+                        Release Lock
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        onClick={() => resource === '1' ? setResource('2') : setResource('1')}>
+                        Toggle Resource: {resource}
+                    </Button>
+                </Stack>
+                <br />
+                <p className="status-label">Resource 1 status: {resource1}</p>
+                <p className="status-label">Resource 2 status: {resource2}</p>
+            </div>
         </div>
     )
 }
