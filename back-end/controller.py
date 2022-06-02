@@ -2,6 +2,10 @@ from threading import Thread
 from threading import Lock
 from time import time_ns
 from RepeatTimer import RepeatTimer
+from redis import Redis
+from pottery import RedisDict
+
+redis = Redis.from_url('redis://localhost:6379')
 
 DEFALUT_LEASING_TIME = 15000000000
 

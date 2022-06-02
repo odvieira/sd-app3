@@ -8,6 +8,8 @@ flask = "*"
 flask-sse = "*"
 flask-cors = "*"
 flask-apscheduler = "*"
+pottery = "*"
+redis = "*"
 
 [dev-packages]
 

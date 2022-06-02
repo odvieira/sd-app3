@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Redis
-app.config["REDIS_URL"] = os.environ.get("redis://127.0.0.1:6379")
+app.config["REDIS_URL"] = os.environ.get("REDIS_URL")
 app.register_blueprint(sse, url_prefix='/stream')
 
 # initialize scheduler

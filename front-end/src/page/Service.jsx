@@ -4,20 +4,21 @@ import { useNavigate } from "react-router-dom"
 import useStore from "../data/Store"
 import Container from 'react-bootstrap/Container'
 import Navbar from 'react-bootstrap/Navbar'
-import { createClient } from 'redis';
+import Redis from "ioredis"
 
 export default function Service() {
     const uname = useStore(state => state.username)
+    const [selfStatus, setSelfStatus] = useState('RELEASED')
     const [user, setUser] = useState(uname)
     const navigate = useNavigate()
-    const subscriber = createClient();
+    const subscriber = Redis()
 
-    subscriber.on('error', (err) => console.log('Redis Client Error', err));
+    subscriber.subscribe(user, (err, count) => err ? console.log([err]) : count)
 
-    await subscriber.connect();
-
-    await subscriber.subscribe(user, (message) => {
-        console.log(message); // 'message'
+    // Protocol: [KIND:str], [CHANNEL:str]. [MESSAGE:str]
+    // The only kind I'm interested in is 'message'
+    subscriber.on('message', (channel, message) => {
+        setSelfStatus(message)
     });
 
     const Bar = () => {
@@ -34,6 +35,11 @@ export default function Service() {
                 </Navbar>
                 <div className="ServiceBody" style={{ padding: 30 }}>
                     <h1>Hello, {user}!</h1>
+                    <Stack gap={2} className="col-md-5 mx-auto">
+                        <Button variant="secondary">Acquire Lock</Button>
+                        <Button variant="outline-secondary">Release Lock</Button>
+                    </Stack>
+                    <p className="status-label">Status: {selfStatus}</p>
                 </div>
             </div>
         )

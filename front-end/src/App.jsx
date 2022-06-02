@@ -1,6 +1,6 @@
 import './App.scss'
 import Home from "./page/Home"
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom"
 import NoPage from "./page/NoPage"
 import Service from './page/Service'
 
