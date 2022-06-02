@@ -11,8 +11,7 @@ from redis import Redis
 
 redis = Redis.from_url('redis://localhost:6379')
 redis.flushall(asynchronous=False)
-
-user = {}
+redis.close()
 
 app = Flask(__name__)
 CORS(app)
@@ -24,16 +23,6 @@ fmt = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
 h = logging.StreamHandler()
 h.setFormatter(fmt)
 log.addHandler(h)
-
-def print_status():
-    print('Queue1: {0}   Queue2: {1}                              '
-          .format(subscribers, subscribers2), end='\r')
-
-
-def updateStatus(usr: str, msg: str):
-    with app.app_context():
-        sse.publish(msg, type='message', channel=usr)
-
 
 DEFALUT_LEASING_TIME = 15000000000
 
@@ -48,6 +37,16 @@ subscribers2 = []
 lock_subscribers2 = Lock()
 leasing_time2 = None
 lock_leasing_time2 = Lock()
+
+
+def print_status():
+    print('Queue1: {0}   Queue2: {1}                              '
+          .format(subscribers, subscribers2), end='\r')
+
+
+def updateStatus(usr: str, msg: str):
+    with app.app_context():
+        sse.publish(msg, type='message', channel=usr)
 
 
 class GenericResource(object):
@@ -227,6 +226,11 @@ class PyScheduler(Thread):
                                         leasing_time2 = time_ns() + DEFALUT_LEASING_TIME
 
 
+resource_a = GenericResource()
+resource_b = GenericResource2()
+sched = BackgroundScheduler(daemon=True)
+sched.start()
+
 @app.route('/')
 def index():
     return jsonify('OK')
@@ -235,32 +239,38 @@ def index():
 @app.route('/acquire/<username>/<resource>')
 def acquire(username, resource):
     if resource == '1':
-        pass
+        global resource_a
+
+        sched.add_job(resource_a.acquire_lock, args=[username])
+
     else:
-        pass
+        global resource_b
+
+        sched.add_job(resource_b.acquire_lock, args=[username])
+
+    return jsonify('OK')
 
 
 @app.route('/release/<username>/<resource>')
 def release(username, resource):
     if resource == '1':
-        pass
+        global resource_a
+
+        sched.add_job(resource_a.release_lock, args=[username])
     else:
-        pass
+        global resource_b
+
+        sched.add_job(resource_b.release_lock, args=[username])
+
+    return jsonify('OK')
 
 
 @app.route('/connect/<username>')
 def connect(username):
-    user[username] = {}
-
-    user[username]['status'] = 'RELEASED'
-
     sched.add_job(updateStatus, args=[username, 'RELEASED'])
 
 
 if __name__ == '__main__':
-    sched = BackgroundScheduler(daemon=True)
-    sched.start()
-
     task_scheduler = PyScheduler()
     task_scheduler.start()
 
