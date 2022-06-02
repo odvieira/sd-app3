@@ -4,22 +4,22 @@ import { useNavigate } from "react-router-dom"
 import useStore from "../data/Store"
 import Container from 'react-bootstrap/Container'
 import Navbar from 'react-bootstrap/Navbar'
-import Redis from "ioredis"
+import Stack from 'react-bootstrap/Stack'
 
 export default function Service() {
     const uname = useStore(state => state.username)
     const [selfStatus, setSelfStatus] = useState('RELEASED')
     const [user, setUser] = useState(uname)
     const navigate = useNavigate()
-    const subscriber = Redis()
+    var source = new EventSource("http://localhost:5000/stream?channel=" + user);
+    
+    source.addEventListener('message', function(event) {
+        console.log([user, event.data])
+    }, false);
 
-    subscriber.subscribe(user, (err, count) => err ? console.log([err]) : count)
-
-    // Protocol: [KIND:str], [CHANNEL:str]. [MESSAGE:str]
-    // The only kind I'm interested in is 'message'
-    subscriber.on('message', (channel, message) => {
-        setSelfStatus(message)
-    });
+    // source.addEventListener('error', function(event) {
+    //     console.log(event.data);
+    // }, false);    
 
     const Bar = () => {
         return (
