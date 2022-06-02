@@ -96,6 +96,7 @@ class GenericResource(object):
 
             elif id in subscribers:
                 subscribers.remove(id)
+                updateStatus(id + self.id_code, 'RELEASED')
 
 
 class GenericResource2(object):
@@ -162,6 +163,7 @@ class GenericResource2(object):
 
             elif id in subscribers2:
                 subscribers2.remove(id)
+                updateStatus(id + self.id_code, 'RELEASED')
 
 
 resource_a = GenericResource()

@@ -32,6 +32,8 @@ export default function Service() {
     );
     
     const handleAcquire = () => {
+        resource == '1' ? setResource1('WANTED') : setResource2('WANTED')
+        
         axios({
             method: 'get',
             url: hostAddress + "/acquire/" + user + "/" + resource,
